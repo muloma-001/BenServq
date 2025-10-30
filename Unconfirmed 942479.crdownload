@@ -1,0 +1,249 @@
+from operations import LibraryManagementSystem
+
+class TestLibraryManagementSystem:
+
+    def setup_method(self):
+        """Set up a fresh library system for each test"""
+        self.library = LibraryManagementSystem()
+
+        # Add some test data
+        self.library.add_book("TEST-001", "Test Book 1", "Author One", "Fiction", 3)
+        self.library.add_book("TEST-002", "Test Book 2", "Author Two", "Sci-Fi", 1)
+        self.library.add_member("Test Member", "test@email.com")
+
+        # Get the auto-generated member ID
+        self.member_id = self.library.get_all_members()[0]['member_id']
+
+    def test_add_book_success(self):
+        """Test adding a book successfully"""
+        success, message = self.library.add_book("TEST-003", "New Book", "New Author", "Mystery", 5)
+        assert success == True
+        assert "New Book" in message
+        assert "TEST-003" in self.library.get_all_books()
+
+    def test_add_book_duplicate_isbn(self):
+        """Test adding a book with duplicate ISBN"""
+        success, message = self.library.add_book("TEST-001", "Duplicate Book", "Some Author", "Fiction", 2)
+        assert success == False
+        assert "already exists" in message
+
+    def test_add_book_invalid_genre(self):
+        """Test adding a book with invalid genre"""
+        success, message = self.library.add_book("TEST-004", "Invalid Genre Book", "Author", "InvalidGenre", 2)
+        assert success == False
+        assert "Invalid genre" in message
+
+    def test_add_book_negative_copies(self):
+        """Test adding a book with negative copies"""
+        success, message = self.library.add_book("TEST-005", "Negative Copies", "Author", "Fiction", -1)
+        assert success == False
+        assert "cannot be negative" in message
+
+    def test_add_member_success(self):
+        """Test adding a member successfully"""
+        success, message = self.library.add_member("John Doe", "john@email.com")
+        assert success == True
+        assert "John Doe" in message
+        assert len(self.library.get_all_members()) == 2
+
+    def test_add_member_duplicate_email(self):
+        """Test adding a member with duplicate email"""
+        success, message = self.library.add_member("Different Name", "test@email.com")
+        assert success == False
+        assert "already exists" in message
+
+    def test_search_books_by_title(self):
+        """Test searching books by title"""
+        success, results = self.library.search_books("title", "Test Book")
+        assert success == True
+        assert len(results) == 2
+
+    def test_search_books_by_author(self):
+        """Test searching books by author"""
+        success, results = self.library.search_books("author", "Author One")
+        assert success == True
+        assert len(results) == 1
+        assert results[0][1]['title'] == "Test Book 1"
+
+    def test_borrow_book_success(self):
+        """Test borrowing a book successfully"""
+        success, message = self.library.borrow_book(self.member_id, "TEST-001")
+        assert success == True
+        assert "borrowed successfully" in message
+
+        # Check that available copies decreased
+        book = self.library.get_book_details("TEST-001")
+        assert book['available_copies'] == 2
+
+        # Check that member has the book
+        member = self.library.get_member_details(self.member_id)
+        assert "TEST-001" in member['borrowed_books']
+
+    def test_borrow_book_no_copies_left(self):
+        """Test borrowing when no copies are available"""
+        # First, borrow the only copy
+        self.library.borrow_book(self.member_id, "TEST-002")
+
+        # Add another member to try borrowing the same book
+        self.library.add_member("Second Member", "second@email.com")
+        second_member_id = self.library.get_all_members()[1]['member_id']
+
+        success, message = self.library.borrow_book(second_member_id, "TEST-002")
+        assert success == False
+        assert "not available" in message
+
+    def test_borrow_book_max_limit(self):
+        """Test borrowing beyond maximum limit (3 books)"""
+        # Add more books
+        self.library.add_book("TEST-003", "Book 3", "Author", "Fiction", 1)
+        self.library.add_book("TEST-004", "Book 4", "Author", "Fiction", 1)
+        self.library.add_book("TEST-005", "Book 5", "Author", "Fiction", 1)
+
+        # Borrow 3 books successfully
+        self.library.borrow_book(self.member_id, "TEST-001")
+        self.library.borrow_book(self.member_id, "TEST-003")
+        self.library.borrow_book(self.member_id, "TEST-004")
+
+        # Try to borrow fourth book
+        success, message = self.library.borrow_book(self.member_id, "TEST-005")
+        assert success == False
+        assert "maximum borrowing limit" in message
+
+    def test_return_book_success(self):
+        """Test returning a book successfully"""
+        # First borrow a book
+        self.library.borrow_book(self.member_id, "TEST-001")
+
+        # Then return it
+        success, message = self.library.return_book(self.member_id, "TEST-001")
+        assert success == True
+        assert "returned successfully" in message
+
+        # Check that available copies increased
+        book = self.library.get_book_details("TEST-001")
+        assert book['available_copies'] == 3
+
+        # Check that member no longer has the book
+        member = self.library.get_member_details(self.member_id)
+        assert "TEST-001" not in member['borrowed_books']
+
+    def test_return_book_not_borrowed(self):
+        """Test returning a book that wasn't borrowed"""
+        success, message = self.library.return_book(self.member_id, "TEST-001")
+        assert success == False
+        assert "haven't borrowed" in message
+
+    def test_update_book_success(self):
+        """Test updating book details successfully"""
+        success, message = self.library.update_book("TEST-001", "title", "Updated Title")
+        assert success == True
+        assert "updated successfully" in message
+
+        book = self.library.get_book_details("TEST-001")
+        assert book['title'] == "Updated Title"
+
+    def test_update_book_copies(self):
+        """Test updating book copies"""
+        # First borrow a copy to test available copies adjustment
+        self.library.borrow_book(self.member_id, "TEST-001")
+
+        success, message = self.library.update_book("TEST-001", "total_copies", "5")
+        assert success == True
+
+        book = self.library.get_book_details("TEST-001")
+        assert book['total_copies'] == 5
+        assert book['available_copies'] == 4  # 5 total - 1 borrowed
+
+    def test_delete_book_success(self):
+        """Test deleting a book successfully"""
+        success, message = self.library.delete_book("TEST-002")
+        assert success == True
+        assert "deleted successfully" in message
+        assert "TEST-002" not in self.library.get_all_books()
+
+    def test_delete_book_with_borrowed_copies(self):
+        """Test deleting a book with borrowed copies"""
+        # First borrow the book
+        self.library.borrow_book(self.member_id, "TEST-001")
+
+        # Try to delete it
+        success, message = self.library.delete_book("TEST-001")
+        assert success == False
+        assert "currently borrowed" in message
+
+    def test_delete_member_success(self):
+        """Test deleting a member successfully"""
+        success, message = self.library.delete_member(self.member_id)
+        assert success == True
+        assert "deleted successfully" in message
+        assert len(self.library.get_all_members()) == 0
+
+    def test_delete_member_with_borrowed_books(self):
+        """Test deleting a member with borrowed books"""
+        # First borrow a book
+        self.library.borrow_book(self.member_id, "TEST-001")
+
+        # Try to delete the member
+        success, message = self.library.delete_member(self.member_id)
+        assert success == False
+        assert "borrowed book(s)" in message
+
+
+def run_tests():
+    """Run all tests and display results"""
+    print("Running Library Management System Tests...")
+    print("=" * 50)
+
+    test_class = TestLibraryManagementSystem()
+
+    # List of test methods to run
+    test_methods = [
+        test_class.test_add_book_success,
+        test_class.test_add_book_duplicate_isbn,
+        test_class.test_add_book_invalid_genre,
+        test_class.test_add_book_negative_copies,
+        test_class.test_add_member_success,
+        test_class.test_add_member_duplicate_email,
+        test_class.test_search_books_by_title,
+        test_class.test_search_books_by_author,
+        test_class.test_borrow_book_success,
+        test_class.test_borrow_book_no_copies_left,
+        test_class.test_borrow_book_max_limit,
+        test_class.test_return_book_success,
+        test_class.test_return_book_not_borrowed,
+        test_class.test_update_book_success,
+        test_class.test_update_book_copies,
+        test_class.test_delete_book_success,
+        test_class.test_delete_book_with_borrowed_copies,
+        test_class.test_delete_member_success,
+        test_class.test_delete_member_with_borrowed_books,
+    ]
+
+    passed = 0
+    failed = 0
+
+    for test_method in test_methods:
+        try:
+            # Reset for each test
+            test_class.setup_method()
+            test_method()
+            print(f"✓ {test_method.__name__}: PASSED")
+            passed += 1
+        except AssertionError as e:
+            print(f"✗ {test_method.__name__}: FAILED - {e}")
+            failed += 1
+        except Exception as e:
+            print(f"✗ {test_method.__name__}: ERROR - {e}")
+            failed += 1
+
+    print("=" * 50)
+    print(f"RESULTS: {passed} passed, {failed} failed, {len(test_methods)} total")
+
+    if failed == 0:
+        print("🎉 All tests passed!")
+    else:
+        print(f"❌ {failed} tests failed!")
+
+
+if __name__ == "__main__":
+    run_tests()

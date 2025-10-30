@@ -1,0 +1,179 @@
+from operations import LibraryManagementSystem
+
+def run_demo():
+    """Run a comprehensive demo of the library system"""
+    print("=" * 60)
+    print("LIBRARY MANAGEMENT SYSTEM - DEMO")
+    print("=" * 60)
+
+    # Initialize the library system
+    library = LibraryManagementSystem()
+
+    # Demo 1: Add Books
+    print("\n1. ADDING BOOKS")
+    print("-" * 30)
+
+    books_to_add = [
+        ("978-0451524935", "1984", "George Orwell", "Fiction", 5),
+        ("978-0061120084", "To Kill a Mockingbird", "Harper Lee", "Fiction", 3),
+        ("978-1451673319", "Fahrenheit 451", "Ray Bradbury", "Sci-Fi", 4),
+        ("978-0141439518", "Pride and Prejudice", "Jane Austen", "Romance", 2),
+        ("978-0307743657", "The Shining", "Stephen King", "Mystery", 3)
+    ]
+
+    for isbn, title, author, genre, copies in books_to_add:
+        success, message = library.add_book(isbn, title, author, genre, copies)
+        print(f"Adding '{title}': {message}")
+
+    # Demo 2: Add Members
+    print("\n2. ADDING MEMBERS")
+    print("-" * 30)
+
+    members_to_add = [
+        ("Alice Johnson", "alice@email.com"),
+        ("Bob Smith", "bob@email.com"),
+        ("Carol Davis", "carol@email.com")
+    ]
+
+    for name, email in members_to_add:
+        success, message = library.add_member(name, email)
+        print(f"Adding {name}: {message}")
+
+    # Demo 3: Display All Books and Members
+    print("\n3. CURRENT LIBRARY STATUS")
+    print("-" * 30)
+
+    print("\nAll Books:")
+    books = library.get_all_books()
+    for isbn, book in books.items():
+        print(f"  {book['title']} by {book['author']} - Available: {book['available_copies']}/{book['total_copies']}")
+
+    print("\nAll Members:")
+    members = library.get_all_members()
+    for member in members:
+        print(f"  {member['name']} (ID: {member['member_id']}) - Borrowed: {len(member['borrowed_books'])}")
+
+    # Demo 4: Search Books
+    print("\n4. SEARCHING BOOKS")
+    print("-" * 30)
+
+    # Search by title
+    success, results = library.search_books("title", "kill")
+    if success and results:
+        print("Search for 'kill' in titles:")
+        for isbn, book in results:
+            print(f"  Found: {book['title']} by {book['author']}")
+
+    # Search by author
+    success, results = library.search_books("author", "Orwell")
+    if success and results:
+        print("Search for 'Orwell' in authors:")
+        for isbn, book in results:
+            print(f"  Found: {book['title']} by {book['author']}")
+
+    # Demo 5: Borrow Books
+    print("\n5. BORROWING BOOKS")
+    print("-" * 30)
+
+    # Get member IDs
+    members = library.get_all_members()
+    alice_id = members[0]['member_id']
+    bob_id = members[1]['member_id']
+
+    # Alice borrows books
+    print(f"\nAlice (ID: {alice_id}) borrowing books:")
+    borrow_operations = [
+        (alice_id, "978-0451524935"),  # 1984
+        (alice_id, "978-0061120084"),  # To Kill a Mockingbird
+        (alice_id, "978-1451673319"),  # Fahrenheit 451
+    ]
+
+    for member_id, isbn in borrow_operations:
+        success, message = library.borrow_book(member_id, isbn)
+        book_title = library.get_book_details(isbn)['title']
+        print(f"  Borrowing '{book_title}': {message}")
+
+    # Try to borrow fourth book (should fail)
+    success, message = library.borrow_book(alice_id, "978-0141439518")
+    print(f"  Trying to borrow fourth book: {message}")
+
+    # Bob borrows a book
+    print(f"\nBob (ID: {bob_id}) borrowing a book:")
+    success, message = library.borrow_book(bob_id, "978-0307743657")
+    book_title = library.get_book_details("978-0307743657")['title']
+    print(f"  Borrowing '{book_title}': {message}")
+
+    # Demo 6: Try to borrow unavailable book
+    print("\n6. TESTING UNAVAILABLE BOOK")
+    print("-" * 30)
+
+    # Try to borrow a book with no available copies
+    success, message = library.borrow_book(bob_id, "978-0451524935")  # 1984 (all copies borrowed)
+    print(f"Borrowing '1984' when no copies available: {message}")
+
+    # Demo 7: Return Books
+    print("\n7. RETURNING BOOKS")
+    print("-" * 30)
+
+    # Alice returns a book
+    print(f"\nAlice returning a book:")
+    success, message = library.return_book(alice_id, "978-0451524935")
+    print(f"  Returning '1984': {message}")
+
+    # Now Bob can borrow it
+    print(f"\nBob borrowing the returned book:")
+    success, message = library.borrow_book(bob_id, "978-0451524935")
+    print(f"  Borrowing '1984': {message}")
+
+    # Demo 8: Update Operations
+    print("\n8. UPDATING RECORDS")
+    print("-" * 30)
+
+    # Update book
+    success, message = library.update_book("978-0141439518", "total_copies", "5")
+    print(f"Updating 'Pride and Prejudice' copies to 5: {message}")
+
+    # Update member
+    carol_id = members[2]['member_id']
+    success, message = library.update_member(carol_id, "email", "carol.new@email.com")
+    print(f"Updating Carol's email: {message}")
+
+    # Demo 9: Final Status
+    print("\n9. FINAL LIBRARY STATUS")
+    print("-" * 30)
+
+    print("\nAll Books (Final):")
+    books = library.get_all_books()
+    for isbn, book in books.items():
+        print(f"  {book['title']} - Available: {book['available_copies']}/{book['total_copies']}")
+
+    print("\nAll Members (Final):")
+    members = library.get_all_members()
+    for member in members:
+        borrowed_books = member['borrowed_books']
+        book_titles = []
+        for isbn in borrowed_books:
+            book = library.get_book_details(isbn)
+            if book:
+                book_titles.append(book['title'])
+        print(f"  {member['name']}: {len(borrowed_books)} books - {book_titles}")
+
+    # Demo 10: Delete Operations (with constraints)
+    print("\n10. DELETE OPERATIONS WITH CONSTRAINTS")
+    print("-" * 30)
+
+    # Try to delete member with borrowed books (should fail)
+    success, message = library.delete_member(alice_id)
+    print(f"Deleting Alice (has borrowed books): {message}")
+
+    # Try to delete book with borrowed copies (should fail)
+    success, message = library.delete_book("978-0061120084")
+    print(f"Deleting 'To Kill a Mockingbird' (borrowed copies): {message}")
+
+    print("\n" + "=" * 60)
+    print("DEMO COMPLETED SUCCESSFULLY!")
+    print("=" * 60)
+
+
+if __name__ == "__main__":
+    run_demo()
